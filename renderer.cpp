@@ -8,6 +8,9 @@ void Renderer::Init()
 	// create fp32 rgb pixel buffer to render to
 	accumulator = (float4*)MALLOC64( SCRWIDTH * SCRHEIGHT * 16 );
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
+
+	CreatePhotonMap();
+	//photonmap.build();
 }
 
 // -----------------------------------------------------------
@@ -127,6 +130,93 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 	return 2.0f * PI * BRDF * Ei * 0.5;
 }
 
+float3 Renderer::ShowPhotons(Ray& ray) {
+	scene.FindNearest(ray);
+	if (ray.objIdx == -1) return 0; // or a fancy sky color
+	float3 I = ray.O + ray.t * ray.D;
+
+	for (int i = 0; i < 10000; i++) {
+		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return float3(1); }
+	}
+	return float3(0);
+}
+
+float3 Renderer::PhotonPath(Ray& ray)
+{
+	scene.FindNearest(ray);
+	float3 I = ray.O + ray.t * ray.D;
+	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+	Mat mat = scene.GetMaterial(ray.objIdx).type;
+
+	if (mat == Mat::MIRROR) {
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		return PhotonPath(reflectedRay);
+	}
+
+	//float roulette = max(albedo.x, albedo.y, albedo.z);
+	float roulette = RandomFloat();
+	if (roulette < 0.7) { return I; }
+
+	if (mat == Mat::GLASS) {
+		if (RandomFloat() < 0.9) {
+			float n1 = 1.00;
+			float n2 = 1.52;
+			float n = n1 / n2;
+			float c1 = -dot(N, ray.D);
+			float k = 1 - n * n * (1 - c1 * c1);
+			if (k >= 0) {
+				float3 T;
+				T = n * ray.D + N * (n * c1 - sqrt(k));
+				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
+				return PhotonPath(refractedRay);
+			}
+		}
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		return PhotonPath(reflectedRay);
+	}
+	float3 R = randomHemDir(N);
+	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
+	return PhotonPath(rayToHemisphere);
+}
+
+void Renderer::CreatePhotonMap() {
+	int nr_of_photons = 10000;
+	for (int i = 0; i < nr_of_photons; i++) {
+		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
+		Quad my_light = scene.quad;
+
+		// choose random starting location on the light source
+		float3 my_pos;
+		my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
+		my_pos.y = 0;
+		my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
+		float3 start_pos = TransformVector(my_pos, my_light.T) + scene.GetLightPos();
+
+		// choose random starting direction for photon
+		float3 my_dir = randomHemDir(my_light.GetNormal(start_pos));
+
+		// update start_pos as not to hit the lightsource immediately
+		start_pos = start_pos + EPSILON * my_dir;
+
+		// determine location of photon
+		Ray pray = Ray(start_pos, my_dir);
+		my_pos = PhotonPath(pray);
+
+		// set photon power
+		float3 my_pow = float3(1, 1, 1);
+
+		// determine incident direct
+		float3 my_inc_dir = pray.D;
+
+		// create and add photon
+		Photon p = Photon(my_pos, my_pow, my_inc_dir);
+
+		photonmap.addPhoton(p);
+	}
+}
 
 float3 Renderer::randomHemDir(float3 N)
 {
@@ -150,7 +240,7 @@ void Renderer::directIllumination(float3 I, float3 N, float3& colorScale)
 	float3 lightPos = scene.GetLightPos();
 	float3 shadowRayDir = normalize(lightPos - I);
 	Ray shadowRay = Ray(I + float3(0.001) * shadowRayDir, shadowRayDir);
-	scene.light.Intersect(shadowRay);
+	scene.quad.Intersect(shadowRay);
 
 	if (!scene.IsOccluded(shadowRay)) {
 		float distToLight = length(lightPos - I);
@@ -184,7 +274,8 @@ void Renderer::Tick( float deltaTime )
 		{
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++) {
-				float3 pt = TracePath(camera.GetPrimaryRay(x, y));
+				//float3 pt = TracePath(camera.GetPrimaryRay(x, y));
+				float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
 				if (length(pt) < EPSILON && length(accumulator[x + y * SCRWIDTH]) > EPSILON);
 				else accumulator[x + y * SCRWIDTH] = float4(pt, 0);
 			}

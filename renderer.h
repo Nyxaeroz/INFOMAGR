@@ -10,6 +10,9 @@ public:
 	void Init();
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
+	float3 ShowPhotons( Ray& ray );
+	float3 PhotonPath( Ray& ray );
+	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );
 	void directIllumination( float3 I, float3 N, float3& colorScale );
 	float Fresnel(float n1, float n2, float3 N, float3 D);
@@ -66,13 +69,15 @@ public:
 	// data members
 	int2 mousePos;
 	float4* accumulator;
-	TriScene scene;
 	Camera camera;
 	bool dragging = false;
 	bool movingW, movingA, movingS, movingD = false;
 	const float EPSILON = 0.01;
 
-	bool path = false; // quick flag for whitted (false) or path (true) tracing
+	Scene scene;
+	bool path = true; // quick flag for whitted (false) or path (true) tracing
+
+	PhotonMap photonmap = PhotonMap();
 };
 
 } // namespace Tmpl8
