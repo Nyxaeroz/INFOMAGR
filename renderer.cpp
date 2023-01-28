@@ -145,6 +145,7 @@ float3 Renderer::PhotonPath(Ray& ray)
 {
 	scene.FindNearest(ray);
 	float3 I = ray.O + ray.t * ray.D;
+	//return I;
 	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
 	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
 	Mat mat = scene.GetMaterial(ray.objIdx).type;
@@ -189,14 +190,15 @@ void Renderer::CreatePhotonMap() {
 		Quad my_light = scene.quad;
 
 		// choose random starting location on the light source
-		float3 my_pos;
-		my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
-		my_pos.y = 0;
-		my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
+		float3 my_pos = float3(0,0,0);
+		//my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
+		//my_pos.y = 0;
+		//my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
 		float3 start_pos = TransformVector(my_pos, my_light.T) + scene.GetLightPos();
 
 		// choose random starting direction for photon
-		float3 my_dir = randomHemDir(my_light.GetNormal(start_pos));
+		//float3 my_dir = randomHemDir(my_light.GetNormal(start_pos));
+		float3 my_dir = randomHemDir(float3(0,-1,0));
 
 		// update start_pos as not to hit the lightsource immediately
 		start_pos = start_pos + EPSILON * my_dir;
@@ -223,9 +225,9 @@ float3 Renderer::randomHemDir(float3 N)
 	// create vector in (-1,-1,-1) - (1,1,1) cube
 	float3 R;
 	do {
-		R.x = RandomFloat();
-		R.y = RandomFloat();
-		R.z = RandomFloat();
+		R.x = Rand(2.0f)-1;
+		R.y = Rand(2.0f)-1;
+		R.z = Rand(2.0f)-1;
 	} while (length(R) > 1);
 
 	// if R points to the other side of a surface N is normal to, flip it
@@ -274,8 +276,8 @@ void Renderer::Tick( float deltaTime )
 		{
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++) {
-				//float3 pt = TracePath(camera.GetPrimaryRay(x, y));
-				float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
+				float3 pt = TracePath(camera.GetPrimaryRay(x, y));
+				//float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
 				if (length(pt) < EPSILON && length(accumulator[x + y * SCRWIDTH]) > EPSILON);
 				else accumulator[x + y * SCRWIDTH] = float4(pt, 0);
 			}
