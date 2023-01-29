@@ -86,7 +86,7 @@ private:
 	void searchKNearestNode(int nodeIdx, const float3& queryPoint, int k,
 		KNNQueue& queue) const 
 	{
-		if (nodeIdx <= 0 || nodeIdx >= nodes.size()) return;
+		if (nodeIdx < 0 || nodeIdx >= nodes.size()) return;
 
 		const Node& node = nodes[nodeIdx];
 

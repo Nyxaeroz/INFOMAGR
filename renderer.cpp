@@ -10,7 +10,7 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	CreatePhotonMap();
-	//photonmap.build();
+	photonmap.build();
 }
 
 // -----------------------------------------------------------
@@ -135,10 +135,24 @@ float3 Renderer::ShowPhotons(Ray& ray) {
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 I = ray.O + ray.t * ray.D;
 
-	for (int i = 0; i < photonmap.getPhotonCount(); i++) {
-		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
+	float maxdist = 0.1;
+	float3 avg_pow = float3(0);
+
+	//printf("ShowPhotons \n");
+	if (photonmap.getPhotonCount() < 1) return float3(0);
+	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, 75, maxdist);
+	//printf("calculating average of %d photons... \n", nearest_photons.size());
+	for (int i = 0; i < nearest_photons.size(); i++)
+	{
+		avg_pow += photonmap.getPhoton(nearest_photons[i]).power;
 	}
-	return float3(0);
+	avg_pow /= nearest_photons.size();
+	return avg_pow;
+
+	//for (int i = 0; i < photonmap.getPhotonCount(); i++) {
+		//if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
+	//}
+	//return float3(0);
 }
 
 void Renderer::PhotonPath(Ray& ray, float3 pow)
@@ -215,7 +229,7 @@ void Renderer::CreatePhotonMap() {
 		start_pos = start_pos + EPSILON * my_dir;
 
 		// set photon power
-		float light_pdf = 1;
+		float light_pdf = 1; // needs to change when using multiple lights
 		float loc_pdf = 1 / (4 * my_light.size * my_light.size); // needs to use transformed quad area
 		float dir_pdf = dot( my_light.GetNormal(my_pos), my_dir ) * INVPI;
 		float3 my_pow = scene.GetLightColor()  * (light_pdf * loc_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
