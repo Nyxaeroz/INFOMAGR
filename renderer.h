@@ -11,7 +11,7 @@ public:
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
 	float3 ShowPhotons( Ray& ray );
-	float3 PhotonPath( Ray& ray );
+	void PhotonPath( Ray& ray, float3 pow );
 	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );
 	void directIllumination( float3 I, float3 N, float3& colorScale );

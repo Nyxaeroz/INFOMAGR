@@ -135,17 +135,19 @@ float3 Renderer::ShowPhotons(Ray& ray) {
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 I = ray.O + ray.t * ray.D;
 
-	for (int i = 0; i < 50000; i++) {
+	for (int i = 0; i < photonmap.getPhotonCount(); i++) {
 		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
 	}
 	return float3(0);
 }
 
-float3 Renderer::PhotonPath(Ray& ray)
+void Renderer::PhotonPath(Ray& ray, float3 pow)
 {
 	scene.FindNearest(ray);
 	float3 I = ray.O + ray.t * ray.D;
-	//return I;
+	//
+	//photonmap.addPhoton(Photon(I, pow, ray.D));
+	//return;
 	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
 	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
 	Mat mat = scene.GetMaterial(ray.objIdx).type;
@@ -153,12 +155,15 @@ float3 Renderer::PhotonPath(Ray& ray)
 	if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		return PhotonPath(reflectedRay);
+		PhotonPath(reflectedRay, pow);
+		return;
 	}
 
-	//float roulette = max(albedo.x, albedo.y, albedo.z);
+	//float roulette = max(albedo.x, max(albedo.y, albedo.z));
 	float roulette = RandomFloat();
-	if (roulette < 0.7) { return I; }
+	if (roulette < 0.7) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
+
+	float3 new_pow = pow * 0.7;
 
 	if (mat == Mat::GLASS) {
 		if (RandomFloat() < 0.9) {
@@ -171,22 +176,28 @@ float3 Renderer::PhotonPath(Ray& ray)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				return PhotonPath(refractedRay);
+				photonmap.addPhoton(Photon(I, pow, ray.D));
+				PhotonPath(refractedRay, new_pow);
+				return;
 			}
 		}
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		return PhotonPath(reflectedRay);
+		PhotonPath(reflectedRay, new_pow);
+		return;
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
-	return PhotonPath(rayToHemisphere);
+	photonmap.addPhoton(Photon(I, pow, ray.D));
+	PhotonPath(rayToHemisphere, new_pow);
+	return;
 }
 
 void Renderer::CreatePhotonMap() {
-	int nr_of_photons = 50000;
-	for (int i = 0; i < nr_of_photons; i++) {
+	int nr_of_photons = 10000;
+	for (int i = 0; i < 50000; i++) {
 		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
+		if (photonmap.getPhotonCount() > nr_of_photons) break;
 		Quad my_light = scene.quad;
 
 		// choose random starting location on the light source
@@ -211,15 +222,15 @@ void Renderer::CreatePhotonMap() {
 	
 		// determine location of photon
 		Ray pray = Ray(start_pos, my_dir);
-		my_pos = PhotonPath(pray);
+		PhotonPath(pray, my_pow);
 
 		// determine incident direct
-		float3 my_inc_dir = pray.D;
+		//float3 my_inc_dir = pray.D;
 
 		// create and add photon
-		Photon p = Photon(my_pos, my_pow, my_inc_dir);
+		//Photon p = Photon(my_pos, my_pow, my_inc_dir);
 
-		photonmap.addPhoton(p);
+		//photonmap.addPhoton(p);
 	}
 }
 
