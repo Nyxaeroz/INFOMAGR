@@ -135,8 +135,8 @@ float3 Renderer::ShowPhotons(Ray& ray) {
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 I = ray.O + ray.t * ray.D;
 
-	for (int i = 0; i < 10000; i++) {
-		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return float3(1); }
+	for (int i = 0; i < 50000; i++) {
+		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
 	}
 	return float3(0);
 }
@@ -184,7 +184,7 @@ float3 Renderer::PhotonPath(Ray& ray)
 }
 
 void Renderer::CreatePhotonMap() {
-	int nr_of_photons = 10000;
+	int nr_of_photons = 50000;
 	for (int i = 0; i < nr_of_photons; i++) {
 		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
 		Quad my_light = scene.quad;
@@ -203,12 +203,15 @@ void Renderer::CreatePhotonMap() {
 		// update start_pos as not to hit the lightsource immediately
 		start_pos = start_pos + EPSILON * my_dir;
 
+		// set photon power
+		float light_pdf = 1;
+		float loc_pdf = 1 / (4 * my_light.size * my_light.size); // needs to use transformed quad area
+		float dir_pdf = dot( my_light.GetNormal(my_pos), my_dir ) * INVPI;
+		float3 my_pow = scene.GetLightColor()  * (light_pdf * loc_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
+	
 		// determine location of photon
 		Ray pray = Ray(start_pos, my_dir);
 		my_pos = PhotonPath(pray);
-
-		// set photon power
-		float3 my_pow = float3(1, 1, 1);
 
 		// determine incident direct
 		float3 my_inc_dir = pray.D;
@@ -276,8 +279,8 @@ void Renderer::Tick( float deltaTime )
 		{
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++) {
-				float3 pt = TracePath(camera.GetPrimaryRay(x, y));
-				//float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
+				//float3 pt = TracePath(camera.GetPrimaryRay(x, y));
+				float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
 				if (length(pt) < EPSILON && length(accumulator[x + y * SCRWIDTH]) > EPSILON);
 				else accumulator[x + y * SCRWIDTH] = float4(pt, 0);
 			}
