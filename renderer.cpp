@@ -298,8 +298,12 @@ void Renderer::Tick( float deltaTime )
 			for (int x = 0; x < SCRWIDTH; x++) {
 				//float3 pt = TracePath(camera.GetPrimaryRay(x, y));
 				float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
-				if (length(pt) < EPSILON && length(accumulator[x + y * SCRWIDTH]) > EPSILON);
-				else accumulator[x + y * SCRWIDTH] = float4(pt, 0);
+
+				if (length(pt) < EPSILON);
+				// if the acculumator doesn't contain a value yet for this pixel, store the obtained color
+				else if (length(accumulator[x + y * SCRWIDTH]) < EPSILON) accumulator[x + y * SCRWIDTH] = float4(pt, 0);
+				// otherwise, average the stored and new values
+				else accumulator[x + y * SCRWIDTH] = accumulator[x + y * SCRWIDTH] * 0.5 + float4(pt, 0) * 0.5;
 			}
 
 			// translate accumulator contents to rgb32 pixels
