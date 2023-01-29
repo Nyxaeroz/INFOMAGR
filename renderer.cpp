@@ -194,17 +194,17 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 }
 
 void Renderer::CreatePhotonMap() {
-	int nr_of_photons = 10000;
-	for (int i = 0; i < 50000; i++) {
-		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
+	for (int i = 0; i < nr_of_photons; i++) {
 		if (photonmap.getPhotonCount() > nr_of_photons) break;
+		
+		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
 		Quad my_light = scene.quad;
 
 		// choose random starting location on the light source
-		float3 my_pos = float3(0,0,0);
-		//my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
-		//my_pos.y = 0;
-		//my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
+		float3 my_pos;
+		my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
+		my_pos.y = 0;
+		my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
 		float3 start_pos = TransformVector(my_pos, my_light.T) + scene.GetLightPos();
 
 		// choose random starting direction for photon
@@ -223,14 +223,6 @@ void Renderer::CreatePhotonMap() {
 		// determine location of photon
 		Ray pray = Ray(start_pos, my_dir);
 		PhotonPath(pray, my_pow);
-
-		// determine incident direct
-		//float3 my_inc_dir = pray.D;
-
-		// create and add photon
-		//Photon p = Photon(my_pos, my_pow, my_inc_dir);
-
-		//photonmap.addPhoton(p);
 	}
 }
 
