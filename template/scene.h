@@ -573,7 +573,13 @@ public:
 		Material glass = Material(Mat::GLASS, float3(1, 1, 1));
 
 		// we store all primitives in one continuous buffer
-		quad = Quad( 0, 1 );									// 0: light source
+		// quad = Quad( 0, 1 );									// 0: light source
+		mat4 L1base = mat4::Translate(float3(-1, 2.6f, 2));
+		mat4 L1 = L1base * mat4::Translate(float3(0, -0.9, 0));
+		lights[0] = Quad(12, 0.5, L1);
+		mat4 L2base = mat4::Translate(float3(1, 2.6f, 2));
+		mat4 L2 = L2base * mat4::Translate(float3(0, -0.9, 0));
+		lights[1] = Quad(13, 0.5, L2);
 		sphere = Sphere( 1, float3( 0 ), 0.5f, mirror );				// 1: bouncing ball
 		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8 );	// 2: rounded corners
 		cube = Cube( 3, float3( 0 ), float3( 1.15f ), glass );			// 3: cube
@@ -595,9 +601,9 @@ public:
 		// enables animation. Updating it per ray can be used for motion blur.
 		animTime = t;
 		// light source animation: swing
-		mat4 M1base = mat4::Translate( float3( 0, 2.6f, 2 ) );
-		mat4 M1 = M1base * mat4::RotateZ( sinf( animTime * 0.6f ) * 0.1f ) * mat4::Translate( float3( 0, -0.9, 0 ) );
-		quad.T = M1, quad.invT = M1.FastInvertedTransformNoScale();
+		// mat4 M1base = mat4::Translate( float3( 0, 2.6f, 2 ) );
+		// mat4 M1 = M1base * mat4::RotateZ( sinf( animTime * 0.6f ) * 0.1f ) * mat4::Translate( float3( 0, -0.9, 0 ) );
+		// quad.T = M1, quad.invT = M1.FastInvertedTransformNoScale();
 		// cube animation: spin
 		mat4 M2base = mat4::RotateX( PI / 4 ) * mat4::RotateZ( PI / 4 );
 		mat4 M2 = mat4::Translate( float3( 1.4f, 0, 2 ) ) * mat4::RotateY( animTime * 0.5f ) * M2base;
@@ -617,6 +623,31 @@ public:
 		float3 corner2 = TransformPosition( float3( 0.5f, 0, 0.5f ), quad.T );
 		return (corner1 + corner2) * 0.5f - float3( 0, 0.01f, 0 );
 	}
+	Quad GetRandomLight(float& pdf)
+	{
+		int length = sizeof(lights) / sizeof(Quad);
+		// is it correct?
+		int r = (int) (RandomFloat() * length);
+		int index = r % length;
+		
+		pdf = 1.0 / length;
+
+		if (index > length - 1)
+		{
+			return lights[length - 1];
+		}
+
+		return lights[index];
+	}
+	float3 GetRandomPosOnLight(Quad quad, float& pdf)
+	{
+		pdf = 1.0 / (quad.size * 2 * quad.size * 2);
+
+		float randX = (RandomFloat() - 0.5f) * quad.size;
+		float randY = (RandomFloat() - 0.5f) * quad.size;
+
+		return TransformPosition(float3(randX, 0, randY), quad.T) - float3(0, 0.01f, 0);
+	}
 	float3 GetLightColor() const
 	{
 		return float3( 2, 2, 2 );
@@ -628,7 +659,12 @@ public:
 		if (ray.D.x < 0) PLANE_X( 3, 4 ) else PLANE_X( -2.99f, 5 );
 		if (ray.D.y < 0) PLANE_Y( 1, 6 ) else PLANE_Y( -2, 7 );
 		if (ray.D.z < 0) PLANE_Z( 3, 8 ) else PLANE_Z( -3.99f, 9 );
-		quad.Intersect( ray );
+		int lights_count = sizeof(lights) / sizeof(Quad);
+		for (int i = 0; i < lights_count; i++)
+		{
+			lights[i].Intersect( ray );
+		}
+		//quad.Intersect( ray );
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
 		cube.Intersect( ray );
@@ -639,7 +675,12 @@ public:
 	{
 		float rayLength = ray.t;
 		// skip planes: it is not possible for the walls to occlude anything
-		quad.Intersect( ray );
+		int lights_count = sizeof(lights) / sizeof(Quad);
+		for (int i = 0; i < lights_count; i++)
+		{
+			lights[i].Intersect(ray);
+		}
+		//quad.Intersect( ray );
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
 		cube.Intersect( ray );
@@ -663,6 +704,8 @@ public:
 		else if (objIdx == 3) N = cube.GetNormal(I);
 		else if (objIdx == 10) N = triangle.GetNormal(I);
 		else if (objIdx == 11) N = torus.GetNormal(I);
+		else if (objIdx == 12) N = lights[0].GetNormal(I);
+		else if (objIdx == 13) N = lights[1].GetNormal(I);
 		else 
 		{
 			// faster to handle the 6 planes without a call to GetNormal
@@ -681,6 +724,8 @@ public:
 		if (objIdx == 3) return cube.GetAlbedo( I );
 		if (objIdx == 10) return triangle.GetAlbedo( I );
 		if (objIdx == 11) return torus.GetAlbedo( I );
+		if (objIdx == 12) return lights[0].GetAlbedo(I);
+		if (objIdx == 13) return lights[1].GetAlbedo(I);
 		return plane[objIdx - 4].GetAlbedo( I );
 		// once we have triangle support, we should pass objIdx and the bary-
 		// centric coordinates of the hit, instead of the intersection location.
@@ -704,6 +749,8 @@ public:
 		if (objIdx == 3) return cube.material;
 		if (objIdx == 10) return triangle.material;
 		if (objIdx == 11) return torus.material;
+		if (objIdx == 12) return lights[0].material;
+		if (objIdx == 13) return lights[1].material;
 		return plane[objIdx - 4].material;
 	}
 
@@ -712,6 +759,7 @@ public:
 	__declspec(align(64)) // start a new cacheline here
 	float animTime = 0;
 	Quad quad;
+	Quad lights[2];
 	Sphere sphere;
 	Sphere sphere2;
 	Cube cube;

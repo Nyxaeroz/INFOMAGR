@@ -78,7 +78,7 @@ public:
 	bool path = true; // quick flag for whitted (false) or path (true) tracing
 
 	PhotonMap photonmap = PhotonMap();
-	int nr_of_photons = 50000;
+	int nr_of_photons = 10000;
 };
 
 } // namespace Tmpl8

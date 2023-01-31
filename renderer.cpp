@@ -92,7 +92,7 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 
 	scene.FindNearest(ray);
 	if (ray.objIdx == -1) return 0;
-	if (ray.objIdx == 0) return scene.GetLightColor();
+	if (ray.objIdx == 0 || ray.objIdx == 12 || ray.objIdx == 13) return scene.GetLightColor();
 	Mat mat = scene.GetMaterial(ray.objIdx).type;
 	float3 I = ray.O + ray.t * ray.D;
 	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
@@ -119,8 +119,6 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
 		return albedo * TracePath(reflectedRay, depth);
-		
-
 	}
 
 	float3 R = randomHemDir(N);
@@ -140,7 +138,7 @@ float3 Renderer::ShowPhotons(Ray& ray) {
 
 	//printf("ShowPhotons \n");
 	if (photonmap.getPhotonCount() < 1) return float3(0);
-	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, 75, maxdist);
+	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, 50, maxdist);
 	//printf("calculating average of %d photons... \n", nearest_photons.size());
 	for (int i = 0; i < nearest_photons.size(); i++)
 	{
@@ -212,30 +210,23 @@ void Renderer::CreatePhotonMap() {
 		if (photonmap.getPhotonCount() > nr_of_photons) break;
 		
 		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
-		Quad my_light = scene.quad;
+		float light_pdf;
+		Quad my_light = scene.GetRandomLight(light_pdf);
 
 		// choose random starting location on the light source
-		float3 my_pos;
-		my_pos.x = RandomFloat() * my_light.size - my_light.size * 0.5;
-		my_pos.y = 0;
-		my_pos.z = RandomFloat() * my_light.size - my_light.size * 0.5;
-		float3 start_pos = TransformVector(my_pos, my_light.T) + scene.GetLightPos();
+		float pos_pdf;
+		float3 my_pos = scene.GetRandomPosOnLight(my_light, pos_pdf);
 
 		// choose random starting direction for photon
 		//float3 my_dir = randomHemDir(my_light.GetNormal(start_pos));
 		float3 my_dir = randomHemDir(float3(0,-1,0));
+		float dir_pdf = dot(my_light.GetNormal(my_pos), my_dir) * INVPI;
 
-		// update start_pos as not to hit the lightsource immediately
-		start_pos = start_pos + EPSILON * my_dir;
+		float3 my_pow = scene.GetLightColor()  * (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
 
-		// set photon power
-		float light_pdf = 1; // needs to change when using multiple lights
-		float loc_pdf = 1 / (4 * my_light.size * my_light.size); // needs to use transformed quad area
-		float dir_pdf = dot( my_light.GetNormal(my_pos), my_dir ) * INVPI;
-		float3 my_pow = scene.GetLightColor()  * (light_pdf * loc_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
-	
 		// determine location of photon
-		Ray pray = Ray(start_pos, my_dir);
+		// update start_pos as not to hit the lightsource immediately
+		Ray pray = Ray(my_pos + (EPSILON * my_dir), my_dir);
 		PhotonPath(pray, my_pow);
 	}
 }
