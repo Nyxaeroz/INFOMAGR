@@ -282,13 +282,25 @@ void Renderer::Tick( float deltaTime )
 		scene.SetTime(0);
 		// pixel loop
 		// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+		// reset accumulator if camera is dirty
+		if (camera.dirty)
+		{
+			#pragma omp parallel for schedule(dynamic)
+			for (int y = 0; y < SCRHEIGHT; y++)
+			{
+				for (int x = 0; x < SCRWIDTH; x++) {
+					accumulator[x + y * SCRWIDTH] = float(0);
+				}
+			}
+			camera.setDirty(false);
+		}
 		#pragma omp parallel for schedule(dynamic)
 		for (int y = 0; y < SCRHEIGHT; y++)
 		{
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++) {
-				//float3 pt = TracePath(camera.GetPrimaryRay(x, y));
-				float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
+				float3 pt = TracePath(camera.GetPrimaryRay(x, y));
+				//float3 pt = ShowPhotons(camera.GetPrimaryRay(x, y));
 
 				if (length(pt) < EPSILON);
 				// if the acculumator doesn't contain a value yet for this pixel, store the obtained color

@@ -28,6 +28,7 @@ public:
 		if (dragging) {
 			camera.rotateLocalY((x - mousePos.x) / 1000.0);
 			camera.rotateLocalX((y - mousePos.y) / 1000.0);
+			camera.setDirty(true);
 		}
 		mousePos.x = x, mousePos.y = y;
 	}
