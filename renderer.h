@@ -80,7 +80,8 @@ public:
 	Scene scene;
 	bool path = false; // quick flag for whitted (false) or path (true) tracing
 
-	PhotonMap photonmap = PhotonMap();
+	PhotonMap globalPhotonmap = PhotonMap();
+	PhotonMap causticsPhotonmap = PhotonMap();
 	int nr_of_photons = 10000;
 	int nr_of_searching_photons = 10;
 };

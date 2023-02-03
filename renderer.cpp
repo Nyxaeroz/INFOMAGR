@@ -10,7 +10,7 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	CreatePhotonMap();
-	photonmap.build();
+	globalPhotonmap.build();
 }
 
 // -----------------------------------------------------------
@@ -204,12 +204,12 @@ float3 Renderer::avgPhotonPow(float3 I, float3 f, int k) {
 	float3 avg_pow = float3(0);
 
 	//printf("ShowPhotons \n");
-	if (photonmap.getPhotonCount() < 1) return float3(0);
-	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, k, maxdist2);
+	if (globalPhotonmap.getPhotonCount() < 1) return float3(0);
+	vector<int> nearest_photons = globalPhotonmap.queryKNearestPhotons(I, k, maxdist2);
 	//printf("calculating average of %d photons... \n", nearest_photons.size());
 	for (int i = 0; i < nearest_photons.size(); i++)
 	{
-		avg_pow += f * photonmap.getPhoton(nearest_photons[i]).power;
+		avg_pow += f * globalPhotonmap.getPhoton(nearest_photons[i]).power;
 	}
 	avg_pow /= (nr_of_photons * PI * maxdist2);
 	return avg_pow;
@@ -242,7 +242,7 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 	}
 
 	float p_surv = min(max(albedo.x, max(albedo.y, albedo.z)), 1.0f);
-	if (RandomFloat() > p_surv) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
+	if (RandomFloat() > p_surv) { globalPhotonmap.addPhoton(Photon(I, pow, ray.D)); return; }
 
 	float3 new_pow = pow * 1 / p_surv;
 
@@ -257,7 +257,7 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				photonmap.addPhoton(Photon(I, pow, ray.D));
+				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
 				PhotonPath(refractedRay, new_pow);
 				return;
 			}
@@ -269,7 +269,7 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
-	photonmap.addPhoton(Photon(I, pow, ray.D));
+	globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
 	PhotonPath(rayToHemisphere, new_pow);
 	return;
 }
@@ -293,7 +293,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	}
 
 	float p_surv = clamp(max(albedo.x, max(albedo.y, albedo.z)), 0.1, 0.9);
-	if (RandomFloat() < p_surv) { photonmap.addPhoton(Photon(I, pow * albedo, ray.D)); return; }
+	if (RandomFloat() < p_surv) { globalPhotonmap.addPhoton(Photon(I, pow * albedo, ray.D)); return; }
 
 	float3 new_pow = pow * 1 / p_surv * albedo;
 
@@ -308,7 +308,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				photonmap.addPhoton(Photon(I, pow, ray.D));
+				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
 				PhotonPath(refractedRay, new_pow);
 				return;
 			}
@@ -320,14 +320,14 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
-	photonmap.addPhoton(Photon(I, pow * albedo, ray.D));
+	globalPhotonmap.addPhoton(Photon(I, pow * albedo, ray.D));
 	PhotonPath(rayToHemisphere, new_pow);
 	return;
 }
 
 void Renderer::CreatePhotonMap() {
 	for (int i = 0; i < nr_of_photons; i++) {
-		if (photonmap.getPhotonCount() > nr_of_photons) break;
+		if (globalPhotonmap.getPhotonCount() > nr_of_photons) break;
 		
 		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
 		float light_pdf;
