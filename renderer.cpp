@@ -240,8 +240,8 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 		return;
 	}
 
-	float p_surv = clamp(max(albedo.x, max(albedo.y, albedo.z)), 0.1, 0.9);
-	if (RandomFloat() < p_surv) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
+	float p_surv = min(max(albedo.x, max(albedo.y, albedo.z)), 1.0f);
+	if (RandomFloat() > p_surv) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
 
 	float3 new_pow = pow * 1 / p_surv;
 
@@ -341,7 +341,7 @@ void Renderer::CreatePhotonMap() {
 		float3 my_dir = randomHemDir(float3(0,-1,0));
 		float dir_pdf = dot(my_light.GetNormal(my_pos), my_dir) * INVPI;
 
-		float3 my_pow = scene.GetLightColor()  * (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
+		float3 my_pow = scene.GetLightColor() / (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
 
 		// determine location of photon
 		// update start_pos as not to hit the lightsource immediately
