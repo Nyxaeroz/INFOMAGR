@@ -148,19 +148,19 @@ public:
 	}
 
 	std::vector<int> searchKNearest(
-		const float3 queryPoint, int k, float& maxDist) const
+		const float3 queryPoint, int k, float& maxDist2) const
 	{
 		KNNQueue queue;
 		searchKNearestNode(0, queryPoint, k, queue);
 
 		std::vector<int> ret(queue.size());
-		maxDist = 0;
+		maxDist2 = 0;
 
 		for (int i = 0; i < ret.size(); i++)
 		{
 			const auto& p = queue.top();
 			ret[i] = p.second;
-			maxDist = max(maxDist, p.first);
+			maxDist2 = max(maxDist2, p.first);
 			queue.pop();
 		}
 
@@ -190,8 +190,8 @@ public:
 	}
 
 	std::vector<int> queryKNearestPhotons(const float3 queryPoint, int k,
-		float& max_dist) const
+		float& max_dist2) const
 	{
-		return kdTree.searchKNearest(queryPoint, k, max_dist);
+		return kdTree.searchKNearest(queryPoint, k, max_dist2);
 	}
 };
