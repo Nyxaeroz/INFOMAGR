@@ -78,10 +78,10 @@ public:
 	const float EPSILON = 0.01;
 
 	Scene scene;
-	bool path = false; // quick flag for whitted (false) or path (true) tracing
+	bool path = false; // quick flag for photon mapping (false) or path (true) tracing
 
 	PhotonMap photonmap = PhotonMap();
-	int nr_of_photons = 10000;
+	int nr_of_photons = 100000;
 	int nr_of_searching_photons = 10;
 };
 

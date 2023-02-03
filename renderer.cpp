@@ -87,6 +87,7 @@ float3 Renderer::Trace( Ray& ray, int depth = 0)
 
 float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 {
+
 	if (depth > 10) return float3(1);
 	depth++;
 
@@ -96,7 +97,14 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
 	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
 	Mat mat = scene.GetMaterial(ray.objIdx).type;
+	
+	/*
+	for (int i = 0; i < photonmap.getPhotonCount(); i++) {
+		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
+	}
+	return float3(0);
 
+	*/
 	if (scene.IsOccluded(ray)) return float3(0);
 	if (ray.objIdx == 0 || ray.objIdx == 12 || ray.objIdx == 13) return scene.GetLightColor();
 	else if (mat == Mat::DIFFUSE) {
@@ -125,12 +133,6 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 			T = n * ray.D + N * (n * c1 - sqrt(k));
 			Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
 
-			/* Without Beer's Law:
-			return 0.9 * albedo * Trace(refractedRay, depth)
-				 + 0.1 * albedo * Trace(reflectedRay, depth);
-			*/
-
-			/* Beer's Law attempt */
 			Ray inMaterialRay = Ray(I + float3(0.1) * ray.D, ray.D);
 			scene.FindNearest(inMaterialRay);
 			float3 I2 = inMaterialRay.O + inMaterialRay.t * inMaterialRay.D;
@@ -210,7 +212,7 @@ float3 Renderer::avgPhotonPow(float3 I, int k) {
 	{
 		avg_pow += photonmap.getPhoton(nearest_photons[i]).power;
 	}
-	avg_pow /= (nearest_photons.size() * PI * maxdist * maxdist * 250);
+	avg_pow /= (nearest_photons.size() * PI * maxdist * maxdist * 75);
 	return clamp(avg_pow, 0.1, 0.9);
 	/*
 
@@ -287,7 +289,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, pow);
+		PhotonPathwCols(reflectedRay, pow);
 		return;
 	}
 
@@ -307,20 +309,20 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				photonmap.addPhoton(Photon(I, pow, ray.D));
-				PhotonPath(refractedRay, new_pow);
+				photonmap.addPhoton(Photon(I, pow * albedo, ray.D));
+				PhotonPathwCols(refractedRay, new_pow);
 				return;
 			}
 		}
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, new_pow);
+		PhotonPathwCols(reflectedRay, new_pow);
 		return;
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
 	photonmap.addPhoton(Photon(I, pow * albedo, ray.D));
-	PhotonPath(rayToHemisphere, new_pow);
+	PhotonPathwCols(rayToHemisphere, new_pow);
 	return;
 }
 
@@ -341,12 +343,12 @@ void Renderer::CreatePhotonMap() {
 		float3 my_dir = randomHemDir(float3(0,-1,0));
 		float dir_pdf = dot(my_light.GetNormal(my_pos), my_dir) * INVPI;
 
-		float3 my_pow = scene.GetLightColor() / (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
+		float3 my_pow = scene.GetLightColor() * (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
 
 		// determine location of photon
 		// update start_pos as not to hit the lightsource immediately
 		Ray pray = Ray(my_pos + (EPSILON * my_dir), my_dir);
-		PhotonPath(pray, my_pow);
+		PhotonPathwCols(pray, my_pow);
 	}
 }
 
