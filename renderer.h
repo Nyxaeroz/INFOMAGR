@@ -11,7 +11,7 @@ public:
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
 	float3 TracewPhotons(Ray& ray, int depth);
-	float3 avgPhotonPow(float3 I, int k);
+	float3 avgPhotonPow(float3 I, float3 f, int k);
 	void PhotonPath( Ray& ray, float3 pow );
 	void PhotonPathwCols(Ray& ray, float3 pow);
 	void CreatePhotonMap();

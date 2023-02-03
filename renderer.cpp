@@ -95,6 +95,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 	float3 I = ray.O + ray.t * ray.D;
 	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
 	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+	float3 BRDF = albedo * INVPI;
 	Mat mat = scene.GetMaterial(ray.objIdx).type;
 
 	if (scene.IsOccluded(ray)) return float3(0);
@@ -102,7 +103,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 	else if (mat == Mat::DIFFUSE) {
 		//float3 colorScale = float3(0);
 		//directIllumination(I, N, colorScale);
-		return albedo * avgPhotonPow(I, nr_of_searching_photons);
+		return BRDF * avgPhotonPow(I, BRDF, nr_of_searching_photons);
 	}
 	else if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
@@ -142,7 +143,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 			intensity.y = exp(-a.y * d);
 			intensity.z = exp(-a.z * d);
 
-			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, nr_of_searching_photons)
+			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, BRDF, nr_of_searching_photons)
 				+ 0.1 * albedo * TracewPhotons(reflectedRay, depth);
 
 		}
@@ -198,20 +199,20 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 	return 2.0f * PI * BRDF * Ei * 0.5;
 }
 
-float3 Renderer::avgPhotonPow(float3 I, int k) {
-	float maxdist = 0.1;
+float3 Renderer::avgPhotonPow(float3 I, float3 f, int k) {
+	float maxdist2;
 	float3 avg_pow = float3(0);
 
 	//printf("ShowPhotons \n");
 	if (photonmap.getPhotonCount() < 1) return float3(0);
-	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, k, maxdist);
+	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, k, maxdist2);
 	//printf("calculating average of %d photons... \n", nearest_photons.size());
 	for (int i = 0; i < nearest_photons.size(); i++)
 	{
-		avg_pow += photonmap.getPhoton(nearest_photons[i]).power;
+		avg_pow += f * photonmap.getPhoton(nearest_photons[i]).power;
 	}
-	avg_pow /= (nearest_photons.size() * PI * maxdist * maxdist * 250);
-	return clamp(avg_pow, 0.1, 0.9);
+	avg_pow /= (nr_of_photons * PI * maxdist2);
+	return avg_pow;
 	/*
 
 

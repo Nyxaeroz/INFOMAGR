@@ -190,8 +190,8 @@ public:
 	}
 
 	std::vector<int> queryKNearestPhotons(const float3 queryPoint, int k,
-		float& max_dist2) const
+		float& maxdist2) const
 	{
-		return kdTree.searchKNearest(queryPoint, k, max_dist2);
+		return kdTree.searchKNearest(queryPoint, k, maxdist2);
 	}
 };
