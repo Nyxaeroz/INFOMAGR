@@ -10,7 +10,8 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	CreatePhotonMap();
-	globalPhotonmap.build();
+	global_photonmap.build();
+	caustics_photonmap.build();
 }
 
 // -----------------------------------------------------------
@@ -103,7 +104,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 	else if (mat == Mat::DIFFUSE) {
 		//float3 colorScale = float3(0);
 		//directIllumination(I, N, colorScale);
-		return BRDF * avgPhotonPow(I, BRDF, nr_of_searching_photons);
+		return BRDF * avgGlobalPhotonPow(I, BRDF, nr_of_searching_photons);
 	}
 	else if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
@@ -143,7 +144,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 			intensity.y = exp(-a.y * d);
 			intensity.z = exp(-a.z * d);
 
-			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, BRDF, nr_of_searching_photons)
+			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgGlobalPhotonPow(I, BRDF, nr_of_searching_photons)
 				+ 0.1 * albedo * TracewPhotons(reflectedRay, depth);
 
 		}
@@ -199,19 +200,19 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 	return 2.0f * PI * BRDF * Ei * 0.5;
 }
 
-float3 Renderer::avgPhotonPow(float3 I, float3 f, int k) {
+float3 Renderer::avgGlobalPhotonPow(float3 I, float3 f, int k) {
 	float maxdist2;
 	float3 avg_pow = float3(0);
 
 	//printf("ShowPhotons \n");
-	if (globalPhotonmap.getPhotonCount() < 1) return float3(0);
-	vector<int> nearest_photons = globalPhotonmap.queryKNearestPhotons(I, k, maxdist2);
+	if (global_photonmap.getPhotonCount() < 1) return float3(0);
+	vector<int> nearest_photons = global_photonmap.queryKNearestPhotons(I, k, maxdist2);
 	//printf("calculating average of %d photons... \n", nearest_photons.size());
 	for (int i = 0; i < nearest_photons.size(); i++)
 	{
-		avg_pow += f * globalPhotonmap.getPhoton(nearest_photons[i]).power;
+		avg_pow += f * global_photonmap.getPhoton(nearest_photons[i]).power;
 	}
-	avg_pow /= (nr_of_photons * PI * maxdist2);
+	avg_pow /= (nr_of_gloabal_photons * PI * maxdist2);
 	return avg_pow;
 	/*
 
@@ -242,7 +243,7 @@ void Renderer::GlobalPhotonPath(Ray& ray, float3 pow)
 	}
 
 	float p_surv = min(max(albedo.x, max(albedo.y, albedo.z)), 1.0f);
-	if (RandomFloat() > p_surv) { globalPhotonmap.addPhoton(Photon(I, pow, ray.D)); return; }
+	if (RandomFloat() > p_surv) { global_photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
 
 	float3 new_pow = pow * 1 / p_surv;
 
@@ -257,7 +258,7 @@ void Renderer::GlobalPhotonPath(Ray& ray, float3 pow)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
+				global_photonmap.addPhoton(Photon(I, pow, ray.D));
 				GlobalPhotonPath(refractedRay, new_pow);
 				return;
 			}
@@ -269,8 +270,61 @@ void Renderer::GlobalPhotonPath(Ray& ray, float3 pow)
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
-	globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
+	global_photonmap.addPhoton(Photon(I, pow, ray.D));
 	GlobalPhotonPath(rayToHemisphere, new_pow);
+	return;
+}
+
+void Renderer::CausticsPhotonPath(Ray& ray, float3 pow, bool isPreviousSpec)
+{
+	scene.FindNearest(ray);
+	float3 I = ray.O + ray.t * ray.D;
+	//
+	//photonmap.addPhoton(Photon(I, pow, ray.D));
+	//return;
+	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+	Mat mat = scene.GetMaterial(ray.objIdx).type;
+
+	if (isPreviousSpec == false && mat == Mat::DIFFUSE) {
+		return;
+	}
+
+	if (isPreviousSpec && mat == Mat::DIFFUSE) {
+		caustics_photonmap.addPhoton(Photon(I, pow, ray.D));
+		return;
+	}
+
+	// russian roulette
+	float p_surv = min(max(albedo.x, max(albedo.y, albedo.z)), 1.0f);
+	if (RandomFloat() > p_surv) { return; }
+
+	float3 new_pow = pow * 1 / p_surv;
+
+	if (mat == Mat::GLASS) {
+		if (RandomFloat() < 0.9) {
+			float n1 = 1.00;
+			float n2 = 1.52;
+			float n = n1 / n2;
+			float c1 = -dot(N, ray.D);
+			float k = 1 - n * n * (1 - c1 * c1);
+			if (k >= 0) {
+				float3 T;
+				T = n * ray.D + N * (n * c1 - sqrt(k));
+				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
+				caustics_photonmap.addPhoton(Photon(I, pow, ray.D));
+				CausticsPhotonPath(refractedRay, new_pow, mat == Mat::MIRROR);
+				return;
+			}
+		}
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		CausticsPhotonPath(reflectedRay, new_pow, mat == Mat::MIRROR);
+		return;
+	}
+	float3 R = randomHemDir(N);
+	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
+	CausticsPhotonPath(rayToHemisphere, new_pow, mat == Mat::MIRROR);
 	return;
 }
 
@@ -293,7 +347,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	}
 
 	float p_surv = clamp(max(albedo.x, max(albedo.y, albedo.z)), 0.1, 0.9);
-	if (RandomFloat() < p_surv) { globalPhotonmap.addPhoton(Photon(I, pow * albedo, ray.D)); return; }
+	if (RandomFloat() < p_surv) { global_photonmap.addPhoton(Photon(I, pow * albedo, ray.D)); return; }
 
 	float3 new_pow = pow * 1 / p_surv * albedo;
 
@@ -308,7 +362,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 				float3 T;
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
-				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
+				global_photonmap.addPhoton(Photon(I, pow, ray.D));
 				GlobalPhotonPath(refractedRay, new_pow);
 				return;
 			}
@@ -320,7 +374,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
-	globalPhotonmap.addPhoton(Photon(I, pow * albedo, ray.D));
+	global_photonmap.addPhoton(Photon(I, pow * albedo, ray.D));
 	GlobalPhotonPath(rayToHemisphere, new_pow);
 	return;
 }
@@ -328,8 +382,8 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 void Renderer::CreatePhotonMap() {
 
 	// build globalPhotonmap
-	for (int i = 0; i < nr_of_photons; i++) {
-		if (globalPhotonmap.getPhotonCount() > nr_of_photons) break;
+	for (int i = 0; i < nr_of_gloabal_photons; i++) {
+		if (global_photonmap.getPhotonCount() > nr_of_gloabal_photons) break;
 		
 		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
 		float light_pdf;
@@ -350,6 +404,31 @@ void Renderer::CreatePhotonMap() {
 		// update start_pos as not to hit the lightsource immediately
 		Ray pray = Ray(my_pos + (EPSILON * my_dir), my_dir);
 		GlobalPhotonPath(pray, my_pow);
+	}
+
+	// build globalPhotonmap
+	for (int i = 0; i < nr_of_caustics_photons; i++) {
+		if (caustics_photonmap.getPhotonCount() > nr_of_caustics_photons) break;
+
+		// choose light sourse to emit photon from (should be sampled according to flux contribution to total)
+		float light_pdf;
+		Quad my_light = scene.GetRandomLight(light_pdf);
+
+		// choose random starting location on the light source
+		float pos_pdf;
+		float3 my_pos = scene.GetRandomPosOnLight(my_light, pos_pdf);
+
+		// choose random starting direction for photon
+		//float3 my_dir = randomHemDir(my_light.GetNormal(start_pos));
+		float3 my_dir = randomHemDir(float3(0, -1, 0));
+		float dir_pdf = dot(my_light.GetNormal(my_pos), my_dir) * INVPI;
+
+		float3 my_pow = scene.GetLightColor() / (light_pdf * pos_pdf * dir_pdf) * abs(dot(my_light.GetNormal(my_pos), my_dir));
+
+		// determine location of photon
+		// update start_pos as not to hit the lightsource immediately
+		Ray pray = Ray(my_pos + (EPSILON * my_dir), my_dir);
+		CausticsPhotonPath(pray, my_pow, false);
 	}
 }
 

@@ -667,7 +667,7 @@ public:
 		//quad.Intersect( ray );
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
-		cube.Intersect( ray );
+		//cube.Intersect( ray );
 		//triangle.Intersect( ray );
 		torus.Intersect( ray );
 	}
@@ -683,7 +683,7 @@ public:
 		//quad.Intersect( ray );
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
-		cube.Intersect( ray );
+		//cube.Intersect( ray );
 		//triangle.Intersect( ray );
 		torus.Intersect( ray );
 		return ray.t < rayLength;

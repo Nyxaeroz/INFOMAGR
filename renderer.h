@@ -11,8 +11,9 @@ public:
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
 	float3 TracewPhotons(Ray& ray, int depth);
-	float3 avgPhotonPow(float3 I, float3 f, int k);
+	float3 avgGlobalPhotonPow(float3 I, float3 f, int k);
 	void GlobalPhotonPath( Ray& ray, float3 pow );
+	void CausticsPhotonPath(Ray& ray, float3 pow, bool isPreviousSpec);
 	void PhotonPathwCols(Ray& ray, float3 pow);
 	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );
@@ -80,9 +81,10 @@ public:
 	Scene scene;
 	bool path = false; // quick flag for whitted (false) or path (true) tracing
 
-	PhotonMap globalPhotonmap = PhotonMap();
-	PhotonMap causticsPhotonmap = PhotonMap();
-	int nr_of_photons = 10000;
+	PhotonMap global_photonmap = PhotonMap();
+	PhotonMap caustics_photonmap = PhotonMap();
+	int nr_of_gloabal_photons = 10000;
+	int nr_of_caustics_photons = 10000;
 	int nr_of_searching_photons = 10;
 };
 
