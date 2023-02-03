@@ -102,7 +102,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 	else if (mat == Mat::DIFFUSE) {
 		//float3 colorScale = float3(0);
 		//directIllumination(I, N, colorScale);
-		return albedo * avgPhotonPow(I, 5);
+		return albedo * avgPhotonPow(I, nr_of_searching_photons);
 	}
 	else if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
@@ -142,7 +142,7 @@ float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
 			intensity.y = exp(-a.y * d);
 			intensity.z = exp(-a.z * d);
 
-			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, 5)
+			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, nr_of_searching_photons)
 				+ 0.1 * albedo * TracewPhotons(reflectedRay, depth);
 
 		}
