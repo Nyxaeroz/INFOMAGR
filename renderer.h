@@ -10,8 +10,10 @@ public:
 	void Init();
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
-	float3 ShowPhotons( Ray& ray );
+	float3 TracewPhotons(Ray& ray, int depth);
+	float3 avgPhotonPow(float3 I, int k);
 	void PhotonPath( Ray& ray, float3 pow );
+	void PhotonPathwCols(Ray& ray, float3 pow);
 	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );
 	void directIllumination( float3 I, float3 N, float3& colorScale );
@@ -76,10 +78,10 @@ public:
 	const float EPSILON = 0.01;
 
 	Scene scene;
-	bool path = true; // quick flag for whitted (false) or path (true) tracing
+	bool path = false; // quick flag for whitted (false) or path (true) tracing
 
 	PhotonMap photonmap = PhotonMap();
-	int nr_of_photons = 10000;
+	int nr_of_photons = 100000;
 };
 
 } // namespace Tmpl8

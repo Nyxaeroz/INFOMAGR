@@ -223,7 +223,7 @@ public:
 	}
 	float3 GetAlbedo( const float3 I ) const
 	{
-		return float3( 1, 1, 1 );
+		return float3( 0.1, 0.1, 0.93 );
 	}
 	float3 b[2];
 	mat4 M, invM;
@@ -412,7 +412,7 @@ public:
 		// return normal in world space
 		return TransformVector(N, T);;
 	}
-	float3 GetAlbedo( const float3 I ) const { return float3( 0.93f ); }
+	float3 GetAlbedo( const float3 I ) const { return float3( 0.93f, 0.01f, 0.01f ); }
 	float A, B, rc2, rt2, r2;
 	mat4 T, invT;
 	Material material;

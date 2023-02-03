@@ -85,6 +85,76 @@ float3 Renderer::Trace( Ray& ray, int depth = 0)
 	/* visualize albedo */  // return albedo;
 }
 
+float3 Renderer::TracewPhotons(Ray& ray, int depth = 0)
+{
+	if (depth > 10) return float3(1);
+	depth++;
+
+	scene.FindNearest(ray);
+	if (ray.objIdx == -1) return 0; // or a fancy sky color
+	float3 I = ray.O + ray.t * ray.D;
+	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+	Mat mat = scene.GetMaterial(ray.objIdx).type;
+
+	if (scene.IsOccluded(ray)) return float3(0);
+	if (ray.objIdx == 0 || ray.objIdx == 12 || ray.objIdx == 13) return scene.GetLightColor();
+	else if (mat == Mat::DIFFUSE) {
+		//float3 colorScale = float3(0);
+		//directIllumination(I, N, colorScale);
+		return albedo * avgPhotonPow(I, 5);
+	}
+	else if (mat == Mat::MIRROR) {
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		return albedo * TracewPhotons(reflectedRay, depth);
+	}
+	else if (mat == Mat::GLASS) {
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+
+		float n1 = 1.00;
+		float n2 = 1.52;
+		float n = n1 / n2;
+		float c1 = -dot(N, ray.D);
+		float k = 1 - n * n * (1 - c1 * c1);
+		float3 T;
+		if (k < 0) return albedo * TracewPhotons(reflectedRay, depth);
+		else
+		{
+			T = n * ray.D + N * (n * c1 - sqrt(k));
+			Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
+
+			/* Without Beer's Law:
+			return 0.9 * albedo * Trace(refractedRay, depth)
+				 + 0.1 * albedo * Trace(reflectedRay, depth);
+			*/
+
+			/* Beer's Law attempt */
+			Ray inMaterialRay = Ray(I + float3(0.1) * ray.D, ray.D);
+			scene.FindNearest(inMaterialRay);
+			float3 I2 = inMaterialRay.O + inMaterialRay.t * inMaterialRay.D;
+			float d = 0;
+			if (ray.objIdx == inMaterialRay.objIdx) float d = length(I2 - I);
+			float3 a = (0.3);
+			float3 intensity;
+			intensity.x = exp(-a.x * d);
+			intensity.y = exp(-a.y * d);
+			intensity.z = exp(-a.z * d);
+
+			return 0.9 * albedo * TracewPhotons(refractedRay, depth) * intensity * avgPhotonPow(I, 5)
+				+ 0.1 * albedo * TracewPhotons(reflectedRay, depth);
+
+		}
+	}
+	else return float3(0);
+
+
+	/* visualize normal */ // return (N + 1) * 0.5f;
+	/* visualize distance */  // return 0.1f * float3( ray.t, ray.t, ray.t );
+	/* visualize albedo */  // return albedo;
+}
+
 float3 Renderer::TracePath(Ray& ray, int depth = 0)
 {
 	if (depth > 10) return float3(0);
@@ -128,29 +198,28 @@ float3 Renderer::TracePath(Ray& ray, int depth = 0)
 	return 2.0f * PI * BRDF * Ei * 0.5;
 }
 
-float3 Renderer::ShowPhotons(Ray& ray) {
-	scene.FindNearest(ray);
-	if (ray.objIdx == -1) return 0; // or a fancy sky color
-	float3 I = ray.O + ray.t * ray.D;
-
+float3 Renderer::avgPhotonPow(float3 I, int k) {
 	float maxdist = 0.1;
 	float3 avg_pow = float3(0);
 
 	//printf("ShowPhotons \n");
 	if (photonmap.getPhotonCount() < 1) return float3(0);
-	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, 50, maxdist);
+	vector<int> nearest_photons = photonmap.queryKNearestPhotons(I, k, maxdist);
 	//printf("calculating average of %d photons... \n", nearest_photons.size());
 	for (int i = 0; i < nearest_photons.size(); i++)
 	{
 		avg_pow += photonmap.getPhoton(nearest_photons[i]).power;
 	}
-	avg_pow /= nearest_photons.size();
-	return avg_pow;
+	avg_pow /= (nearest_photons.size() * PI * maxdist * maxdist * 250);
+	return clamp(avg_pow, 0.1, 0.9);
+	/*
 
-	//for (int i = 0; i < photonmap.getPhotonCount(); i++) {
-		//if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
-	//}
-	//return float3(0);
+
+	for (int i = 0; i < photonmap.getPhotonCount(); i++) {
+		if (length(photonmap.getPhoton(i).position - I) < EPSILON) { return photonmap.getPhoton(i).power; }
+	}
+	return float3(0);
+	*/
 }
 
 void Renderer::PhotonPath(Ray& ray, float3 pow)
@@ -171,11 +240,10 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 		return;
 	}
 
-	//float roulette = max(albedo.x, max(albedo.y, albedo.z));
-	float roulette = RandomFloat();
-	if (roulette < 0.7) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
+	float p_surv = clamp(max(albedo.x, max(albedo.y, albedo.z)), 0.1, 0.9);
+	if (RandomFloat() < p_surv) { photonmap.addPhoton(Photon(I, pow, ray.D)); return; }
 
-	float3 new_pow = pow * 0.7;
+	float3 new_pow = pow * 1 / p_surv;
 
 	if (mat == Mat::GLASS) {
 		if (RandomFloat() < 0.9) {
@@ -201,6 +269,57 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
 	photonmap.addPhoton(Photon(I, pow, ray.D));
+	PhotonPath(rayToHemisphere, new_pow);
+	return;
+}
+
+void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
+{
+	scene.FindNearest(ray);
+	float3 I = ray.O + ray.t * ray.D;
+	//
+	//photonmap.addPhoton(Photon(I, pow, ray.D));
+	//return;
+	float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+	float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+	Mat mat = scene.GetMaterial(ray.objIdx).type;
+
+	if (mat == Mat::MIRROR) {
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		PhotonPath(reflectedRay, pow);
+		return;
+	}
+
+	float p_surv = clamp(max(albedo.x, max(albedo.y, albedo.z)), 0.1, 0.9);
+	if (RandomFloat() < p_surv) { photonmap.addPhoton(Photon(I, pow * albedo, ray.D)); return; }
+
+	float3 new_pow = pow * 1 / p_surv * albedo;
+
+	if (mat == Mat::GLASS) {
+		if (RandomFloat() < 0.9) {
+			float n1 = 1.00;
+			float n2 = 1.52;
+			float n = n1 / n2;
+			float c1 = -dot(N, ray.D);
+			float k = 1 - n * n * (1 - c1 * c1);
+			if (k >= 0) {
+				float3 T;
+				T = n * ray.D + N * (n * c1 - sqrt(k));
+				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
+				photonmap.addPhoton(Photon(I, pow, ray.D));
+				PhotonPath(refractedRay, new_pow);
+				return;
+			}
+		}
+		float3 reflectedDir = reflect(ray.D, N); //already unit length
+		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
+		PhotonPath(reflectedRay, new_pow);
+		return;
+	}
+	float3 R = randomHemDir(N);
+	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
+	photonmap.addPhoton(Photon(I, pow * albedo, ray.D));
 	PhotonPath(rayToHemisphere, new_pow);
 	return;
 }
@@ -317,8 +436,9 @@ void Renderer::Tick( float deltaTime )
 	}
 	else {
 		// animation
-		static float animTime = 0;
-		scene.SetTime(animTime+= deltaTime * 0.002f);
+		//static float animTime = 0;
+		scene.SetTime(0);
+		//scene.SetTime(animTime+= deltaTime * 0.002f);
 		// pixel loop
 		// camera movement 
 		float3 v1 = camera.bottomLeft - camera.topLeft;
@@ -335,7 +455,7 @@ void Renderer::Tick( float deltaTime )
 		{
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++)
-				accumulator[x + y * SCRWIDTH] = float4(Trace( camera.GetPrimaryRay( x, y ) ), 0);
+				accumulator[x + y * SCRWIDTH] = float4(TracewPhotons( camera.GetPrimaryRay( x, y ) ), 0);
 				
 			// translate accumulator contents to rgb32 pixels
 			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
