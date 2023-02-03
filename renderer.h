@@ -12,7 +12,7 @@ public:
 	float3 TracePath( Ray& ray, int depth );
 	float3 TracewPhotons(Ray& ray, int depth);
 	float3 avgPhotonPow(float3 I, float3 f, int k);
-	void PhotonPath( Ray& ray, float3 pow );
+	void GlobalPhotonPath( Ray& ray, float3 pow );
 	void PhotonPathwCols(Ray& ray, float3 pow);
 	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );

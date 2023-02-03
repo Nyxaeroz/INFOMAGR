@@ -223,7 +223,7 @@ float3 Renderer::avgPhotonPow(float3 I, float3 f, int k) {
 	*/
 }
 
-void Renderer::PhotonPath(Ray& ray, float3 pow)
+void Renderer::GlobalPhotonPath(Ray& ray, float3 pow)
 {
 	scene.FindNearest(ray);
 	float3 I = ray.O + ray.t * ray.D;
@@ -237,7 +237,7 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 	if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, pow);
+		GlobalPhotonPath(reflectedRay, pow);
 		return;
 	}
 
@@ -258,19 +258,19 @@ void Renderer::PhotonPath(Ray& ray, float3 pow)
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
 				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
-				PhotonPath(refractedRay, new_pow);
+				GlobalPhotonPath(refractedRay, new_pow);
 				return;
 			}
 		}
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, new_pow);
+		GlobalPhotonPath(reflectedRay, new_pow);
 		return;
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
 	globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
-	PhotonPath(rayToHemisphere, new_pow);
+	GlobalPhotonPath(rayToHemisphere, new_pow);
 	return;
 }
 
@@ -288,7 +288,7 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 	if (mat == Mat::MIRROR) {
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, pow);
+		GlobalPhotonPath(reflectedRay, pow);
 		return;
 	}
 
@@ -309,23 +309,25 @@ void Renderer::PhotonPathwCols(Ray& ray, float3 pow)
 				T = n * ray.D + N * (n * c1 - sqrt(k));
 				Ray refractedRay = Ray(I + EPSILON * T, normalize(T));
 				globalPhotonmap.addPhoton(Photon(I, pow, ray.D));
-				PhotonPath(refractedRay, new_pow);
+				GlobalPhotonPath(refractedRay, new_pow);
 				return;
 			}
 		}
 		float3 reflectedDir = reflect(ray.D, N); //already unit length
 		Ray reflectedRay = Ray(I + EPSILON * reflectedDir, reflectedDir);
-		PhotonPath(reflectedRay, new_pow);
+		GlobalPhotonPath(reflectedRay, new_pow);
 		return;
 	}
 	float3 R = randomHemDir(N);
 	Ray rayToHemisphere = Ray(I + R * EPSILON, R);
 	globalPhotonmap.addPhoton(Photon(I, pow * albedo, ray.D));
-	PhotonPath(rayToHemisphere, new_pow);
+	GlobalPhotonPath(rayToHemisphere, new_pow);
 	return;
 }
 
 void Renderer::CreatePhotonMap() {
+
+	// build globalPhotonmap
 	for (int i = 0; i < nr_of_photons; i++) {
 		if (globalPhotonmap.getPhotonCount() > nr_of_photons) break;
 		
@@ -347,7 +349,7 @@ void Renderer::CreatePhotonMap() {
 		// determine location of photon
 		// update start_pos as not to hit the lightsource immediately
 		Ray pray = Ray(my_pos + (EPSILON * my_dir), my_dir);
-		PhotonPath(pray, my_pow);
+		GlobalPhotonPath(pray, my_pow);
 	}
 }
 
