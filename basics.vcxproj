@@ -131,6 +131,7 @@
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="bvh.h" />
+    <ClInclude Include="photon_map.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="template\common.h" />
     <ClInclude Include="template\precomp.h" />

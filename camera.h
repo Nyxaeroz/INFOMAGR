@@ -100,10 +100,16 @@ public:
 		const float3 P = ntopLeft + u * (ntopRight - ntopLeft) + v * (nbottomLeft - ntopLeft);
 		return Ray( camPos, normalize( P - camPos ) );
 	}
+
+	void setDirty(bool v)
+	{
+		dirty = v;
+	}
 	float aspect = (float)SCRWIDTH / (float)SCRHEIGHT;
 	float3 camPos, viewDir, screenCenter;
 	float FOV = 1;
 	float3 topLeft, topRight, bottomLeft;
+	bool dirty = false;
 };
 
 }

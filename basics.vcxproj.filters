@@ -19,6 +19,7 @@
       <Filter>template</Filter>
     </ClInclude>
     <ClInclude Include="bvh.h" />
+    <ClInclude Include="photon_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="template">

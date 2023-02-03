@@ -1651,6 +1651,7 @@ public:
 
 #include "scene.h"
 #include "camera.h"
+#include "photon_map.h"
 #include "renderer.h"
 
 // EOF

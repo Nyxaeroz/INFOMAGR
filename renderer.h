@@ -10,6 +10,11 @@ public:
 	void Init();
 	float3 Trace( Ray& ray, int depth );
 	float3 TracePath( Ray& ray, int depth );
+	float3 TracewPhotons(Ray& ray, int depth);
+	float3 avgPhotonPow(float3 I, int k);
+	void PhotonPath( Ray& ray, float3 pow );
+	void PhotonPathwCols(Ray& ray, float3 pow);
+	void CreatePhotonMap();
 	float3 randomHemDir( float3 N );
 	void directIllumination( float3 I, float3 N, float3& colorScale );
 	float Fresnel(float n1, float n2, float3 N, float3 D);
@@ -25,6 +30,7 @@ public:
 		if (dragging) {
 			camera.rotateLocalY((x - mousePos.x) / 1000.0);
 			camera.rotateLocalX((y - mousePos.y) / 1000.0);
+			camera.setDirty(true);
 		}
 		mousePos.x = x, mousePos.y = y;
 	}
@@ -66,13 +72,17 @@ public:
 	// data members
 	int2 mousePos;
 	float4* accumulator;
-	TriScene scene;
 	Camera camera;
 	bool dragging = false;
 	bool movingW, movingA, movingS, movingD = false;
 	const float EPSILON = 0.01;
 
-	bool path = false; // quick flag for whitted (false) or path (true) tracing
+	Scene scene;
+	bool path = false; // quick flag for photon mapping (false) or path (true) tracing
+
+	PhotonMap photonmap = PhotonMap();
+	int nr_of_photons = 100000;
+	int nr_of_searching_photons = 10;
 };
 
 } // namespace Tmpl8
